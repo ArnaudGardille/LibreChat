@@ -38,6 +38,8 @@ const startServer = async () => {
 
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', trusted_proxy);
+
   await AppService(app);
 
   const indexPath = path.join(app.locals.paths.dist, 'index.html');
@@ -49,23 +51,24 @@ const startServer = async () => {
   app.use(noIndex);
   app.use(errorController);
   app.use(express.json({ limit: '3mb' }));
-  app.use(mongoSanitize());
   app.use(express.urlencoded({ extended: true, limit: '3mb' }));
-  app.use(staticCache(app.locals.paths.dist));
-  app.use(staticCache(app.locals.paths.fonts));
-  app.use(staticCache(app.locals.paths.assets));
-  app.set('trust proxy', trusted_proxy);
+  app.use(mongoSanitize());
   app.use(cors());
   app.use(cookieParser());
 
   if (!isEnabled(DISABLE_COMPRESSION)) {
     app.use(compression());
+  } else {
+    console.warn('Response compression has been disabled via DISABLE_COMPRESSION.');
   }
 
+  // Serve static assets with aggressive caching
+  app.use(staticCache(app.locals.paths.dist));
+  app.use(staticCache(app.locals.paths.fonts));
+  app.use(staticCache(app.locals.paths.assets));
+
   if (!ALLOW_SOCIAL_LOGIN) {
-    console.warn(
-      'Social logins are disabled. Set Environment Variable "ALLOW_SOCIAL_LOGIN" to true to enable them.',
-    );
+    console.warn('Social logins are disabled. Set ALLOW_SOCIAL_LOGIN=true to enable them.');
   }
 
   /* OAUTH */
@@ -128,7 +131,7 @@ const startServer = async () => {
   });
 
   app.listen(port, host, () => {
-    if (host == '0.0.0.0') {
+    if (host === '0.0.0.0') {
       logger.info(
         `Server listening on all interfaces at port ${port}. Use http://localhost:${port} to access it`,
       );
