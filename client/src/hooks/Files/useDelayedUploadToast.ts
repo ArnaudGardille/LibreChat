@@ -8,7 +8,7 @@ export const useDelayedUploadToast = () => {
   const [uploadTimers, setUploadTimers] = useState<Record<string, NodeJS.Timeout>>({});
 
   const determineDelay = (fileSize: number): number => {
-    const baseDelay = 5000;
+    const baseDelay = 50000;
     const additionalDelay = Math.floor(fileSize / 1000000) * 2000;
     return baseDelay + additionalDelay;
   };
