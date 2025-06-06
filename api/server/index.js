@@ -9,8 +9,9 @@ const passport = require('passport');
 const mongoSanitize = require('express-mongo-sanitize');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
+const { connectDb, indexSync } = require('~/db');
+
 const { jwtLogin, passportLogin } = require('~/strategies');
-const { connectDb, indexSync } = require('~/lib/db');
 const { isEnabled } = require('~/server/utils');
 const { ldapLogin } = require('~/strategies');
 const { logger } = require('~/config');
@@ -24,19 +25,22 @@ const routes = require('./routes');
 
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
-const port = Number(PORT) || 3080;
+// Allow PORT=0 to be used for automatic free port assignment
+const port = isNaN(Number(PORT)) ? 3080 : Number(PORT);
 const host = HOST || 'localhost';
 const trusted_proxy = Number(TRUST_PROXY) || 1; /* trust first proxy by default */
+
+const app = express();
 
 const startServer = async () => {
   if (typeof Bun !== 'undefined') {
     axios.defaults.headers.common['Accept-Encoding'] = 'gzip';
   }
   await connectDb();
+
   logger.info('Connected to MongoDB');
   await indexSync();
 
-  const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', trusted_proxy);
 
@@ -73,7 +77,7 @@ const startServer = async () => {
 
   /* OAUTH */
   app.use(passport.initialize());
-  passport.use(await jwtLogin());
+  passport.use(jwtLogin());
   passport.use(passportLogin());
 
   /* LDAP Auth */
@@ -82,7 +86,7 @@ const startServer = async () => {
   }
 
   if (isEnabled(ALLOW_SOCIAL_LOGIN)) {
-    configureSocialLogins(app);
+    await configureSocialLogins(app);
   }
 
   app.use('/oauth', routes.oauth);
@@ -179,3 +183,6 @@ process.on('uncaughtException', (err) => {
 
   process.exit(1);
 });
+
+// export app for easier testing purposes
+module.exports = app;
